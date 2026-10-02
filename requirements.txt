@@ -9,3 +9,4 @@ scikit-learn
 ipython
 ipykernel
 notebook
+flask
