@@ -1,0 +1,374 @@
+# E-Commerce Catalog Analytics
+
+An end-to-end analytics project for a scraped multi-marketplace e-commerce catalog. It covers data profiling, feature engineering, marketplace benchmarking, lightweight machine learning (segmentation, anomaly detection, review propensity), opportunity scoring, and an **interactive web dashboard where you can upload your own CSV and explore the results instantly**.
+
+The project can be used in three ways:
+
+1. **Jupyter notebook** for step-by-step analysis and charts.
+2. **Command-line pipeline** (`main.py`) that exports result tables to CSV.
+3. **Web dashboard** (Flask + HTML/CSS/JS) with filters, 60+ charts and CSV upload.
+
+---
+
+## Table of contents
+
+- [Features](#features)
+- [Tech stack](#tech-stack)
+- [Project structure](#project-structure)
+- [Dataset](#dataset)
+- [How the pipeline works](#how-the-pipeline-works)
+- [Machine learning models](#machine-learning-models)
+- [Scores explained](#scores-explained)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Web dashboard](#web-dashboard)
+- [Outputs](#outputs)
+- [Deploying on Render](#deploying-on-render)
+- [Troubleshooting](#troubleshooting)
+- [Limitations](#limitations)
+- [Roadmap](#roadmap)
+
+---
+
+## Features
+
+**Data analysis**
+- Structural profiling: column audit, missingness, duplicates, constant and identifier columns
+- Currency-aware feature engineering (USD, AED and EGP are never mixed on one price scale)
+- Commercial signals: price, rating, reviews, discount penetration, brand engagement
+- Text signals: common title terms and phrases, and wording that over-indexes in high-engagement listings
+- Freshness and scrape-timing analysis
+
+**Machine learning (lightweight, exploratory)**
+- Product segmentation with KMeans and PCA
+- Anomaly detection with Isolation Forest, plus a "hidden gems" finder
+- Review-propensity model with Random Forest, plus a "breakout candidates" list
+
+**Decision support**
+- Marketplace benchmark matrix (source x category pockets)
+- Strategic opportunity score for every product
+- Executive summary and export-ready CSV files
+
+**Web dashboard**
+- Upload any compatible CSV and get a full dashboard
+- Global filters: source, category, currency, availability, minimum reviews, minimum rating, free-text search
+- 5 tabs: Dashboard, Products, Analysis, Chart Gallery, Insights
+- Download the filtered products as CSV
+
+---
+
+## Tech stack
+
+| Area | Tools |
+|---|---|
+| Data processing | Python, pandas, NumPy |
+| Machine learning | scikit-learn (KMeans, PCA, IsolationForest, RandomForest) |
+| Notebook visuals | matplotlib, seaborn, plotly, ipywidgets |
+| Backend | Flask, Gunicorn |
+| Frontend | HTML, CSS, vanilla JavaScript, Chart.js, Plotly.js |
+| Hosting | Render |
+
+---
+
+## Project structure
+
+```
+ecommerce-analysis/
+├── README.md
+├── requirements.txt              # Full local environment (notebook, plotting, etc.)
+├── requirements-render.txt       # Minimal dependencies for the web server
+├── .gitignore
+├── main.py                       # Runs the full pipeline and exports CSV files
+├── export_web.py                 # Builds the dashboard payload (and website/data/data.js)
+├── server.py                     # Flask app: serves the dashboard and handles CSV upload
+│
+├── data/
+│   ├── raw/                      # Put ecommerce_dataset.csv here
+│   └── processed/                # Optional intermediate data
+│
+├── notebooks/
+│   └── e-commerce-dataset-analysis.ipynb
+│
+├── src/
+│   ├── __init__.py
+│   ├── config.py                 # Paths, constants, display settings
+│   ├── data_loader.py            # CSV loading, type cleanup, column validation
+│   ├── profiling.py              # Structural profiling and missingness tables
+│   ├── features.py               # Feature engineering
+│   ├── commercial.py             # Price, rating, discount and brand analysis
+│   ├── text_signals.py           # Title and wording analysis
+│   ├── freshness.py              # Scrape timing analysis
+│   ├── benchmark.py              # Source x category benchmark matrix
+│   ├── opportunity.py            # Strategic opportunity score
+│   ├── summary.py                # Executive summary text
+│   ├── export.py                 # CSV / TXT exports
+│   ├── plotting.py               # matplotlib / seaborn / plotly helpers (notebook)
+│   ├── dashboard.py              # ipywidgets slicer dashboard (notebook)
+│   └── models/
+│       ├── __init__.py
+│       ├── segmentation.py       # KMeans + PCA
+│       ├── anomaly.py            # IsolationForest + hidden gems
+│       └── propensity.py         # RandomForest review propensity
+│
+├── website/
+│   ├── index.html                # Dashboard page
+│   ├── style.css                 # Styles (light and dark mode)
+│   ├── app.js                    # Filters, KPIs, Chart.js charts, tables, upload
+│   ├── gallery.js                # Plotly chart gallery (49 charts)
+│   └── data/
+│       └── data.js               # Optional demo data generated by export_web.py
+│
+└── outputs/                      # Generated CSV and summary files
+```
+
+---
+
+## Dataset
+
+The project was built for the Kaggle dataset `darwish1337/ecommerce` (`ecommerce_dataset.csv`): a scraped catalog snapshot with about 1,000 rows and 21 columns across several marketplaces and currencies.
+
+**Required columns**
+
+`product_id`, `external_id`, `title`, `brand`, `category`, `source`, `currency`, `availability`, `price_current`, `price_original`, `discount_pct`, `rating_score`, `reviews_count`, `scraped_at`
+
+**Optional columns:** `description`, `tags`, `subcategory`, `url`, `first_image`, `images_count`
+
+Notes about the data:
+- `price_original` and `discount_pct` are empty when a product is not discounted. These are structural nulls, not random gaps, and are treated that way.
+- `rating_score` has real missing values. They are imputed with the median and flagged with `rating_missing_flag`.
+- This is a **scraped catalog snapshot, not sales data**. Review counts are social proof, not a direct sales measure.
+
+Download the file from Kaggle and place it at `data/raw/ecommerce_dataset.csv`.
+
+---
+
+## How the pipeline works
+
+```
+CSV
+ └─ load_data            clean types, validate columns
+     └─ build_features   price, discount, rating, text, availability, timing features
+         └─ run_segmentation   KMeans clusters + PCA coordinates
+             └─ run_anomaly    Isolation Forest flags and scores
+                 └─ run_propensity   Random Forest review propensity
+                     ├─ build_benchmark     source x category score
+                     ├─ build_opportunity   product-level opportunity score
+                     ├─ build_summary       executive summary text
+                     └─ export_all          CSV and TXT files
+```
+
+The order matters: the benchmark and opportunity steps use columns created by the three models (`cluster`, `anomaly_flag`, `anomaly_score`, `high_review_propensity`).
+
+### Key engineered features
+
+| Feature | Meaning |
+|---|---|
+| `price_tier_within_currency` | Budget / Mid-range / Premium / Luxury, ranked inside each currency |
+| `discount_pct_filled`, `has_discount`, `discount_depth` | Discount behaviour without treating structural nulls as missing |
+| `rating_score_imputed`, `rating_missing_flag` | Usable rating plus a flag that keeps the missingness signal |
+| `engagement_score` | `rating x log(1 + reviews)`: one practical ranking signal |
+| `in_stock_flag`, `limited_flag` | Availability indicators |
+| `title_length`, `title_word_count`, `description_length` | Text length features |
+| `days_since_latest_scrape`, `scrape_day`, `scrape_hour` | Freshness and timing |
+
+---
+
+## Machine learning models
+
+| Model | Purpose | Details |
+|---|---|---|
+| **KMeans + PCA** | Group products into behavioural segments | k chosen from 2 to 6 by silhouette score; features are standardised; PCA gives 2D coordinates for plotting |
+| **Isolation Forest** | Find unusual listings | 300 trees, 5% contamination; produces `anomaly_flag` and `anomaly_score` |
+| **Random Forest** | Estimate which listings resemble high-review products | Target: reviews in the top 25%; 75/25 stratified split; balanced class weights; reports ROC AUC, accuracy, precision and recall on the holdout set |
+
+All models use `random_state=42`, so results are reproducible.
+
+> The models are exploratory decision-support tools. `high_review_propensity` is computed on all rows (in-sample) for ranking; judge model quality only from the holdout metrics.
+
+---
+
+## Scores explained
+
+**Benchmark score** (per source-category pocket): weighted z-scores of average rating (0.25), average engagement (0.25), in-stock share (0.20), review propensity (0.15), average discount (0.10) and anomaly share (0.15, inverted: fewer anomalies is better).
+
+**Opportunity score** (per product): percentile-rank blend of rating (0.28), review propensity (0.24), review gap (0.18, fewer reviews means more under-exposed), in-stock flag (0.15) and discount rank (0.10), minus an anomaly penalty (0.10).
+
+**Hidden gems:** in stock, rating in the top 15%, reviews in the bottom 35%.
+
+**Breakout candidates:** not yet high-review, but in the top 10% of predicted propensity.
+
+Scores are relative to the dataset they are computed on. Do not compare scores across different datasets.
+
+---
+
+## Installation
+
+**Requirements:** Python 3.10 or newer.
+
+```bash
+# 1. Clone and enter the project
+git clone <your-repo-url>
+cd ecommerce-analysis
+
+# 2. Create and activate a virtual environment
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+source .venv/bin/activate       # macOS / Linux
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Add the dataset
+#    data/raw/ecommerce_dataset.csv
+```
+
+On Windows PowerShell, if activation is blocked:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+```
+
+---
+
+## Usage
+
+### 1. Web dashboard with CSV upload (recommended)
+
+```bash
+pip install flask
+python server.py
+```
+
+Open **http://127.0.0.1:5000** and click **Upload CSV**. Model training takes roughly 10 to 60 seconds, then every tab updates with your data.
+
+Do not open the page through VS Code Live Server (port 5500) if you want uploads to work; the backend is needed.
+
+### 2. Notebook
+
+Open `notebooks/e-commerce-dataset-analysis.ipynb`, select the `.venv` kernel and run the cells from top to bottom. The notebook only calls functions from `src/`; the logic lives in the modules.
+
+```python
+df = load_data(DATA_PATH)
+eda_df = build_features(df)
+eda_df, cluster_profile = run_segmentation(eda_df)
+eda_df, anomaly_summary, top_anomalies, hidden_gems = run_anomaly(eda_df)
+eda_df, metrics_df, breakout = run_propensity(eda_df)
+bench = run_benchmark(eda_df)
+opp = run_opportunity(eda_df)
+```
+
+### 3. Command-line pipeline
+
+```bash
+python main.py
+python main.py --data path/to/file.csv --out path/to/outputs
+```
+
+### 4. Generate demo data for the website
+
+```bash
+python export_web.py
+```
+
+This writes `website/data/data.js`, which the dashboard loads automatically when the page opens.
+
+---
+
+## Web dashboard
+
+| Tab | What you get |
+|---|---|
+| **Dashboard** | 6 KPI cards and 12 charts: configurable ranking (group by, metric, top N), availability mix, rating distribution, cluster sizes, source share, products and rating by category, discount and anomaly share by source, opportunity by source, cluster radar, category combo chart |
+| **Products** | Sortable table of filtered products |
+| **Analysis** | Price vs rating bubble chart by cluster (per currency), category x source heatmap with 7 selectable metrics, price tier mix, opportunity map |
+| **Chart Gallery** | 49 Plotly charts grouped as Basic, Comparison and trend, Statistical, Relationship, Specialized, Time and freshness, Business and Machine learning |
+| **Insights** | Top strategic products, hidden gems and top anomalies |
+
+**Chart Gallery highlights:** bar, column, line, area, pie, donut, histogram, scatter, bubble, grouped / stacked / 100% stacked bars, multi-line, stacked area, combo and dual-axis, box, violin, strip, error bars, KDE, ECDF, QQ plot, heatmaps, correlation matrix, scatter matrix, parallel coordinates, radar, funnel, waterfall, gauge, bullet, treemap, sunburst, Sankey, calendar-style heatmap, Pareto, confusion matrix, ROC, precision-recall, calibration and feature importance.
+
+All filters apply to every tab. The dashboard supports light and dark mode automatically.
+
+---
+
+## Outputs
+
+`main.py` and the notebook export these files to `outputs/`:
+
+| File | Content |
+|---|---|
+| `benchmark_matrix.csv` | Source x category benchmark with scores |
+| `top_anomalies.csv` | 50 most unusual listings |
+| `hidden_gems.csv` | High-rating, low-review, in-stock products |
+| `breakout_candidates.csv` | Products likely to become high-review |
+| `strategic_products.csv` | Top products by opportunity score |
+| `executive_summary.txt` | Headline findings and strategic priorities |
+
+---
+
+## Deploying on Render
+
+1. Push the project to GitHub (`.gitignore` keeps virtual environments and local data out).
+2. Create `requirements-render.txt` in the project root:
+
+   ```
+   flask
+   gunicorn
+   pandas
+   numpy
+   scikit-learn
+   ```
+
+3. On Render, create a **Web Service** from the repository with:
+
+   | Setting | Value |
+   |---|---|
+   | Build Command | `pip install -r requirements-render.txt` |
+   | Start Command | `gunicorn server:app --timeout 180 --workers 1` |
+   | Environment variable | `PYTHON_VERSION` = `3.12.3` |
+
+Notes for the free plan:
+- 512 MB RAM: fine for thousands of rows, but very large CSVs may run out of memory.
+- The service sleeps after about 15 minutes of inactivity; the first request afterwards is slow.
+- Uploaded files are processed in a temporary folder and are not stored.
+- The `--timeout 180` flag is required; Gunicorn's default 30 seconds is shorter than model training.
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `ModuleNotFoundError: No module named 'src'` | Run commands from the project root; in the notebook keep `sys.path.append(str(Path.cwd().parent))` |
+| `KeyError: 'has_discount'` | Make sure `features.py` creates `has_discount` from `discount_pct_filled` |
+| `ValueError: ... zaroori columns nahi mile` | Your CSV is missing required columns; see [Dataset](#dataset) |
+| Notebook: "No connection selected" | The SQL (mssql) kernel is selected; choose your Python `.venv` kernel and set cell language to Python |
+| Dashboard charts do not appear | Check the browser console (F12); make sure Chart.js and Plotly CDN scripts load (internet required) |
+| Upload fails | Open the site through `http://127.0.0.1:5000` and check that `python server.py` is running |
+| Chart Gallery card says "data not available" | The dataset lacks the needed field (for example `scraped_at` for timing charts) |
+
+---
+
+## Limitations
+
+- The data is a **snapshot of a scraped catalog**, not transactions. Do not read review counts as sales.
+- Prices in different currencies are never converted; compare prices inside one currency.
+- Clustering, anomaly detection and propensity are exploratory and depend on the dataset size and quality.
+- The hidden-gem and funnel thresholds (for example 85th and 35th percentiles) are judgement calls and can be tuned.
+- Datasets with very few rows can make the models fail (for example when a class has fewer than two rows).
+- Geographic, candlestick, Gantt, cohort and network charts are not included because the dataset has no matching fields.
+
+---
+
+## Roadmap
+
+- Learning curve and SHAP explanations for the propensity model
+- Price tracking across multiple scrapes (true time-series)
+- Currency conversion with a reference exchange-rate table
+- Saved dashboard views and shareable filter links
+- Authentication and persistent storage for uploaded datasets
+
+---
+
+## License
+
+Add your preferred license (for example MIT) before publishing.

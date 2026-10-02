@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-Commerce Catalog Dashboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>E-Commerce Catalog Dashboard</h1>
+  <nav>
+    <button class="tab active" data-tab="dashboard">Dashboard</button>
+    <button class="tab" data-tab="products">Products</button>
+    <button class="tab" data-tab="analysis">Analysis</button>
+    <button class="tab" data-tab="gallery">Chart Gallery</button>
+    <button class="tab" data-tab="insights">Insights</button>
+  </nav>
+  <label class="up">Upload CSV<input type="file" id="csv" accept=".csv" hidden></label>
+</header>
+
+<section class="filters">
+  <label>Source <select id="f-source"></select></label>
+  <label>Category <select id="f-category"></select></label>
+  <label>Currency <select id="f-currency"></select></label>
+  <label>Availability <select id="f-availability"></select></label>
+  <label>Min reviews <input type="number" id="f-reviews" value="0" min="0"></label>
+  <label>Min rating <input type="number" id="f-rating" value="0" min="0" max="5" step="0.1"></label>
+  <label>Search <input type="search" id="f-search" placeholder="title or brand"></label>
+  <button id="reset">Clear</button>
+  <button id="dl">Download CSV</button>
+</section>
+<p id="status"></p>
+
+<main>
+  <div id="tab-dashboard" class="panel">
+    <div id="kpis" class="kpis"></div>
+    <div class="grid">
+      <div class="card wide">
+        <div class="card-head">
+          <h2>Ranking</h2>
+          <select id="g-group"></select>
+          <select id="g-metric"></select>
+          <select id="g-top"><option>8</option><option selected>12</option><option>20</option></select>
+        </div>
+        <canvas id="c-rank"></canvas>
+      </div>
+      <div class="card"><h2>Availability mix</h2><canvas id="c-avail"></canvas></div>
+      <div class="card"><h2>Rating distribution</h2><canvas id="c-rating"></canvas></div>
+      <div class="card"><h2>Cluster sizes</h2><canvas id="c-cluster"></canvas></div>
+      <div class="card"><h2>Source share</h2><canvas id="c-src"></canvas></div>
+      <div class="card"><h2>Products by category</h2><canvas id="c-cat"></canvas></div>
+      <div class="card"><h2>Avg rating by category</h2><canvas id="c-catrate"></canvas></div>
+      <div class="card"><h2>Discounted % by source</h2><canvas id="c-disc"></canvas></div>
+      <div class="card"><h2>Anomaly % by source</h2><canvas id="c-anom"></canvas></div>
+      <div class="card"><h2>Avg opportunity score by source</h2><canvas id="c-opps"></canvas></div>
+      <div class="card"><h2>Cluster profile (radar)</h2><canvas id="c-radar"></canvas></div>
+      <div class="card wide"><h2>Category: product count (bars) and avg rating (line)</h2><canvas id="c-combo"></canvas></div>
+    </div>
+  </div>
+
+  <div id="tab-products" class="panel hidden">
+    <div class="card">
+      <div class="card-head"><h2>Products</h2>
+        <select id="p-sort"></select>
+      </div>
+      <div class="table-wrap" id="t-products"></div>
+    </div>
+  </div>
+
+  <div id="tab-analysis" class="panel hidden">
+    <div class="grid">
+      <div class="card wide"><div class="card-head"><h2>Price vs rating by cluster (bubble = reviews)</h2><select id="a-cur"></select></div><canvas id="c-bubble"></canvas></div>
+      <div class="card wide"><div class="card-head"><h2>Heatmap: category x source</h2><select id="a-metric"></select></div><div class="table-wrap" id="heat"></div></div>
+      <div class="card"><h2>Price tier mix by source</h2><canvas id="c-tier"></canvas></div>
+      <div class="card"><h2>Opportunity map: review propensity vs engagement</h2><canvas id="c-opp"></canvas></div>
+    </div>
+  </div>
+
+  <div id="tab-gallery" class="panel hidden"><div id="gallery"></div></div>
+
+  <div id="tab-insights" class="panel hidden">
+    <div class="card"><h2>Top strategic products</h2><div class="table-wrap" id="t-opp"></div></div>
+    <div class="card"><h2>Hidden gems (high rating, low reviews, in stock)</h2><div class="table-wrap" id="t-gems"></div></div>
+    <div class="card"><h2>Top anomalies</h2><div class="table-wrap" id="t-anom"></div></div>
+  </div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/plotly.js-dist-min@2.35.2/plotly.min.js"></script>
+<script src="data/data.js"></script>
+<script src="gallery.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

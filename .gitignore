@@ -1,0 +1,41 @@
+# ---- Virtual environments ----
+.venv/
+.venv-*/
+venv/
+env/
+ENV/
+
+# ---- Python cache / build ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# ---- Jupyter ----
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ---- Local data and generated outputs ----
+data/raw/
+data/processed/
+outputs/
+
+# Website ka generated data (python export_web.py banata hai).
+# Live site par demo data dikhana ho to is line ko hata do (ya # laga do).
+# website/data/data.js
+
+# ---- Secrets ----
+.env
+*.env
+.env.*
+
+# ---- Editor / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Logs ----
+*.log
